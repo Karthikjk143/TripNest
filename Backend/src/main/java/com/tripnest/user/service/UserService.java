@@ -1,9 +1,11 @@
 package com.tripnest.user.service;
 
-import com.tripnest.user.dto.UpdateProfileRequest;
-import com.tripnest.user.dto.UserProfileResponse;
+import com.tripnest.user.dto.UserProfileDTO;
+import java.util.Optional;
 
 public interface UserService {
-    UserProfileResponse getUserProfile(String username);
-    UserProfileResponse updateUserProfile(String username, UpdateProfileRequest request);
+    UserProfileDTO getUserProfile(Long userId);
+    UserProfileDTO updateUserProfile(Long userId, UserProfileDTO profileDTO);
+    UserProfileDTO getProfileByEmail(String email);
+    UserProfileDTO getProfileByUsername(String username);
 }
