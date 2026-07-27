@@ -1,261 +1,143 @@
-import { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ListTodo } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { itineraryService, activityService } from '../services/modules';
+import { motion } from 'framer-motion';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
-import { itineraryService } from '../../services/itineraryService';
-import { tripService } from '../../services/tripService';
-import ItineraryHeader from '../../components/itinerary/ItineraryHeader';
-import DaySelector from '../../components/itinerary/DaySelector';
-import { ItinerarySkeletons } from '../../components/itinerary/ItinerarySkeletons';
-import EmptyState from '../../components/ui/EmptyState';
-
-// Views
-import TimelineView from '../../components/itinerary/TimelineView';
-import CalendarView from '../../components/itinerary/CalendarView';
-import KanbanView from '../../components/itinerary/KanbanView';
-
-// Modals/Widgets
-import ActivityModal from '../../components/itinerary/ActivityModal';
-import ReminderCenter from '../../components/itinerary/ReminderCenter';
-
-export default function ItineraryDashboard() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const searchParams = new URLSearchParams(location.search);
-  const tripId = searchParams.get('tripId');
-  
+const ItineraryDashboard = () => {
+  const { tripId } = useParams();
+  const [itinerary, setItinerary] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [trip, setTrip] = useState(null);
-  const [activities, setActivities] = useState([]);
-  const [reminders, setReminders] = useState([]);
-  const [allTrips, setAllTrips] = useState([]);
-  
-  // State
-  const [viewMode, setViewMode] = useState('timeline'); // timeline, calendar, kanban
-  const [selectedDay, setSelectedDay] = useState('all');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingActivity, setEditingActivity] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [showActivityForm, setShowActivityForm] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        let activeTripId = tripId;
-        const trips = await tripService.getTrips();
-        setAllTrips(trips);
-        
-        // If tripId is not specified or is not found in the user's active trips
-        if (!activeTripId || trips.every(t => String(t.id) !== String(activeTripId))) {
-          if (trips && trips.length > 0) {
-            activeTripId = trips[0].id;
-            // Update URL query string to match the selected active trip
-            navigate(`/dashboard/itinerary?tripId=${activeTripId}`, { replace: true });
-          } else {
-            activeTripId = null;
-          }
-        }
-        
-        if (activeTripId) {
-          const [tripData, acts, rems] = await Promise.all([
-            tripService.getTripById(activeTripId),
-            itineraryService.getActivitiesByTrip(activeTripId),
-            itineraryService.getReminders(activeTripId)
-          ]);
-          
-          setTrip(tripData);
-          setActivities(acts);
-          setReminders(rems);
-        } else {
-          setTrip(null);
-          setActivities([]);
-          setReminders([]);
-        }
-      } catch (error) {
-        console.error("Failed to load itinerary", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, [tripId, navigate]);
+    fetchItinerary();
+  }, [tripId]);
 
-  const handleAddActivity = () => {
-    setEditingActivity(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEditActivity = (activity) => {
-    setEditingActivity(activity);
-    setIsModalOpen(true);
-  };
-
-  const handleDeleteActivity = async (id) => {
-    await itineraryService.deleteActivity(id);
-    setActivities(prev => prev.filter(a => a.id !== id));
-  };
-
-  const handleSaveActivity = async (data) => {
+  const fetchItinerary = async () => {
     try {
-      if (editingActivity) {
-        const updated = await itineraryService.updateActivity(editingActivity.id, data);
-        setActivities(prev => prev.map(a => a.id === updated.id ? updated : a));
-      } else {
-        const added = await itineraryService.addActivity(data);
-        setActivities(prev => [...prev, added]);
+      setLoading(true);
+      const response = await itineraryService.getByTrip(tripId);
+      setItinerary(response.data.data);
+      if (response.data.data.length > 0) {
+        setSelectedDay(response.data.data[0]);
       }
-      setIsModalOpen(false);
-    } catch (err) {
-      console.error("Error saving activity:", err);
-      alert("Failed to save activity: " + (err.message || JSON.stringify(err)));
+    } catch (error) {
+      console.error('Error fetching itinerary:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Generate dynamic days array from trip startDate and endDate
-  const getTripDays = () => {
-    if (!trip || !trip.startDate || !trip.endDate) return [];
-    const start = new Date(trip.startDate);
-    const end = new Date(trip.endDate);
-    const days = [];
-    let dayNum = 1;
-    
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateFormatted = d.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        weekday: 'short'
-      });
-      const dateStr = d.toISOString().split('T')[0];
-      days.push({
-        id: dateStr,
-        dayNumber: dayNum++,
-        dateFormatted: dateFormatted
-      });
-    }
-    return days;
-  };
-
-  const sortedActivities = [...activities].sort((a, b) => {
-    const dateA = String(a.date || '');
-    const dateB = String(b.date || '');
-    if (dateA !== dateB) {
-      return dateA.localeCompare(dateB);
-    }
-    const timeA = String(a.startTime || '');
-    const timeB = String(b.startTime || '');
-    return timeA.localeCompare(timeB);
-  });
-
-  const filteredActivities = selectedDay === 'all' 
-    ? sortedActivities 
-    : sortedActivities.filter(a => a.date === selectedDay);
-
-  const renderView = () => {
-    switch (viewMode) {
-      case 'calendar':
-        return <CalendarView activities={filteredActivities} trip={trip} />;
-      case 'kanban':
-        return <KanbanView activities={filteredActivities} />;
-      case 'timeline':
-      default:
-        return (
-          <TimelineView 
-            activities={filteredActivities} 
-            onEditActivity={handleEditActivity}
-            onDeleteActivity={handleDeleteActivity}
-          />
-        );
-    }
-  };
+  if (loading) return <LoadingSpinner />;
 
   return (
-    <AnimatePresence mode="wait">
-      {loading ? (
-        <motion.div
-          key="skeleton"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <ItinerarySkeletons />
-        </motion.div>
-      ) : !trip ? (
-        <motion.div
-          key="empty"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          className="min-h-[60vh] flex items-center justify-center bg-white rounded-[24px] border border-border/50 p-6"
-        >
-          <EmptyState 
-            icon={ListTodo}
-            title="No Active Trip Found"
-            message="You need to create a trip first before you can plan its day-wise itinerary."
-            actionLabel="Create a Trip"
-            onAction={() => navigate('/dashboard/trips/create')}
-          />
-        </motion.div>
-      ) : (
-        <motion.div
-          key="content"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.4 }}
-          className="space-y-6 pb-8"
-        >
-          {/* Header */}
-          <ItineraryHeader 
-            trip={trip} 
-            trips={allTrips}
-            activities={activities}
-            viewMode={viewMode} 
-            setViewMode={setViewMode} 
-            onAddActivity={handleAddActivity} 
-          />
+    <div className="space-y-8">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-r from-primary to-secondary rounded-lg p-8 text-white"
+      >
+        <h1 className="text-4xl font-bold mb-2">Trip Itinerary</h1>
+        <p className="text-lg opacity-90">Plan your activities day by day</p>
+      </motion.div>
 
-          <div className="flex flex-col lg:flex-row gap-6 relative">
-            {/* Left Sidebar: Reminders & Days */}
-            <div className="w-full lg:w-72 space-y-6 shrink-0 lg:sticky lg:top-24 h-max">
-              <ReminderCenter reminders={reminders} />
-              
-              <DaySelector 
-                days={getTripDays()} 
-                selectedDay={selectedDay} 
-                onSelectDay={setSelectedDay} 
-              />
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Days Sidebar */}
+        <div className="lg:col-span-1 space-y-2">
+          <h2 className="text-xl font-bold mb-4">Days</h2>
+          {itinerary.map((day, index) => (
+            <motion.button
+              key={day.id}
+              onClick={() => setSelectedDay(day)}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className={`w-full p-4 text-left rounded-lg transition-all ${
+                selectedDay?.id === day.id
+                  ? 'bg-primary text-white shadow-lg'
+                  : 'bg-gray-100 hover:bg-gray-200'
+              }`}
+            >
+              <p className="font-semibold">Day {day.dayNumber}</p>
+              <p className="text-sm opacity-75">{new Date(day.date).toLocaleDateString()}</p>
+            </motion.button>
+          ))}
+        </div>
 
-            {/* Main Content Area */}
-            <div className="flex-1 min-w-0">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={viewMode + selectedDay}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}
-                  className="bg-white rounded-[24px] border border-border/50 shadow-sm p-6 min-h-[500px]"
+        {/* Activities */}
+        <div className="lg:col-span-2">
+          {selectedDay && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4"
+            >
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">
+                  Day {selectedDay.dayNumber} - {new Date(selectedDay.date).toLocaleDateString()}
+                </h2>
+                <button
+                  onClick={() => setShowActivityForm(!showActivityForm)}
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
                 >
-                  {renderView()}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </div>
+                  + Add Activity
+                </button>
+              </div>
 
-          <ActivityModal 
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            onSave={handleSaveActivity}
-            activity={editingActivity}
-            trip={trip}
-          />
-        </motion.div>
-      )}
-    </AnimatePresence>
+              {showActivityForm && (
+                <div className="bg-gray-50 p-4 rounded-lg border border-border">
+                  <p className="text-text-muted">Activity form coming soon...</p>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {selectedDay.activities?.length > 0 ? (
+                  selectedDay.activities.map((activity, index) => (
+                    <motion.div
+                      key={activity.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="bg-white p-4 rounded-lg border-l-4 border-primary shadow-sm hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold text-lg">{activity.title}</h3>
+                          <p className="text-sm text-text-muted">
+                            {activity.type} • {activity.startTime} - {activity.endTime}
+                          </p>
+                          <p className="text-text-secondary mt-2">{activity.description}</p>
+                          {activity.location && (
+                            <p className="text-sm mt-2">📍 {activity.location}</p>
+                          )}
+                        </div>
+                        {activity.estimatedCost && (
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-accent">₹{activity.estimatedCost}</p>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))
+                ) : (
+                  <p className="text-text-muted text-center py-6">No activities planned for this day</p>
+                )}
+              </div>
+
+              {selectedDay.notes && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="font-semibold text-yellow-900 mb-2">Notes</p>
+                  <p className="text-yellow-800">{selectedDay.notes}</p>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </div>
+      </div>
+    </div>
   );
-}
+};
+
+export default ItineraryDashboard;
