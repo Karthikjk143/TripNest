@@ -2,9 +2,11 @@ package com.tripnest.expense.entity;
 
 public enum ExpenseCategory {
     TRANSPORTATION,
-    HOTEL,
+    ACCOMMODATION,
     FOOD,
     SHOPPING,
     ENTERTAINMENT,
+    ACTIVITIES,
+    UTILITIES,
     MISCELLANEOUS
 }
