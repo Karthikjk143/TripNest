@@ -1,49 +1,45 @@
 package com.tripnest.common.dto;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
+import lombok.*;
 import java.time.LocalDateTime;
-import java.util.Map;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ApiResponse<T> {
-    private boolean success;
+    private int code;
     private String message;
     private T data;
-    private Map<String, String> errors;
-
-    @Builder.Default
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS")
-    private LocalDateTime timestamp = LocalDateTime.now();
+    private LocalDateTime timestamp;
+    private boolean success;
 
     public static <T> ApiResponse<T> success(T data, String message) {
         return ApiResponse.<T>builder()
-                .success(true)
+                .code(200)
                 .message(message)
                 .data(data)
+                .timestamp(LocalDateTime.now())
+                .success(true)
                 .build();
     }
 
-    public static <T> ApiResponse<T> success(T data) {
-        return success(data, "Operation completed successfully");
-    }
-
-    public static <T> ApiResponse<T> error(String message, Map<String, String> errors) {
+    public static <T> ApiResponse<T> error(int code, String message) {
         return ApiResponse.<T>builder()
-                .success(false)
+                .code(code)
                 .message(message)
-                .errors(errors)
+                .timestamp(LocalDateTime.now())
+                .success(false)
                 .build();
     }
 
-    public static <T> ApiResponse<T> error(String message) {
-        return error(message, null);
+    public static <T> ApiResponse<T> created(T data, String message) {
+        return ApiResponse.<T>builder()
+                .code(201)
+                .message(message)
+                .data(data)
+                .timestamp(LocalDateTime.now())
+                .success(true)
+                .build();
     }
 }
