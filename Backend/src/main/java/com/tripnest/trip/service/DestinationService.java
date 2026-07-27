@@ -1,12 +1,16 @@
 package com.tripnest.trip.service;
 
-import com.tripnest.trip.dto.DestinationResponse;
-import com.tripnest.trip.dto.WeatherResponse;
-
+import com.tripnest.trip.dto.DestinationDTO;
 import java.util.List;
+import java.util.Optional;
 
 public interface DestinationService {
-    List<DestinationResponse> getAllDestinations(String search, Boolean popular);
-    DestinationResponse getDestinationById(Long id);
-    WeatherResponse getWeatherForDestination(Long id);
+    DestinationDTO createDestination(DestinationDTO destinationDTO);
+    DestinationDTO updateDestination(Long id, DestinationDTO destinationDTO);
+    void deleteDestination(Long id);
+    DestinationDTO getDestinationById(Long id);
+    List<DestinationDTO> getAllDestinations();
+    List<DestinationDTO> searchDestinations(String query);
+    List<DestinationDTO> getDestinationsByCountry(String country);
+    List<DestinationDTO> getTopDestinations();
 }

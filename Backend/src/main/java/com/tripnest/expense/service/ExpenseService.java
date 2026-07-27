@@ -1,14 +1,18 @@
 package com.tripnest.expense.service;
 
-import com.tripnest.expense.dto.CreateExpenseRequest;
-import com.tripnest.expense.dto.ExpenseResponse;
-import com.tripnest.expense.dto.UpdateExpenseRequest;
-
+import com.tripnest.expense.dto.ExpenseDTO;
+import com.tripnest.expense.dto.BudgetDTO;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 public interface ExpenseService {
-    ExpenseResponse addExpense(Long tripId, CreateExpenseRequest request, String username);
-    ExpenseResponse updateExpense(Long tripId, Long expenseId, UpdateExpenseRequest request, String username);
-    void deleteExpense(Long tripId, Long expenseId, String username);
-    List<ExpenseResponse> getExpensesByTrip(Long tripId, String username);
+    ExpenseDTO createExpense(ExpenseDTO expenseDTO);
+    ExpenseDTO updateExpense(Long id, ExpenseDTO expenseDTO);
+    void deleteExpense(Long id);
+    ExpenseDTO getExpenseById(Long id);
+    List<ExpenseDTO> getExpensesByTrip(Long tripId);
+    BigDecimal getTotalExpensesByTrip(Long tripId);
+    List<ExpenseDTO> getExpensesByCategory(Long tripId, String category);
+    List<ExpenseDTO> getExpensesByDateRange(Long tripId, LocalDate startDate, LocalDate endDate);
 }
